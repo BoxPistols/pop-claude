@@ -1,0 +1,28 @@
+{
+  "name": "claude-guard",
+  "version": "1.0.0",
+  "description": "Claude Codeのコマンドをローカルで承認/拒否するmacOSメニューバーアプリ",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "setup": "node setup.js",
+    "build": "electron-builder --mac",
+    "dev": "NODE_ENV=development electron ."
+  },
+  "build": {
+    "appId": "dev.claudeguard.app",
+    "productName": "Claude Guard",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg"],
+      "extendInfo": { "LSUIElement": true }
+    },
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "hook.js", "setup.js"]
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "license": "MIT"
+}

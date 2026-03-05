@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Guard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --bg-primary: #0D1117;
+    --bg-secondary: #161B22;
+    --bg-tertiary: #21262D;
+    --bg-card: #1C2128;
+    --border: #30363D;
+    --border-subtle: #21262D;
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-muted: #484F58;
+    --accent-blue: #58A6FF;
+    --accent-green: #3FB950;
+    --accent-orange: #FF6B35;
+    --accent-red: #F85149;
+    --accent-yellow: #D29922;
+    --claude-purple: #A855F7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ─── タイトルバー ── */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    -webkit-app-region: drag;
+    cursor: default;
+    flex-shrink: 0;
+  }
+
+  .titlebar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .app-icon {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, var(--claude-purple), var(--accent-blue));
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .app-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+  }
+
+  .titlebar-actions {
+    display: flex;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+  }
+
+  .close-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #FF5F57;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .close-btn:hover { opacity: 0.7; }
+
+  /* ─── ステータスバー ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.has-pending {
+    background: var(--accent-orange);
+    box-shadow: 0 0 8px var(--accent-orange);
+    animation: pulse-orange 1s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  @keyframes pulse-orange {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.3); }
+  }
+
+  .pending-badge {
+    background: var(--accent-orange);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .quick-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .quick-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  .quick-btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .quick-btn.approve-all:hover {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .quick-btn.reject-all:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+  }
+
+  /* ─── リクエストリスト ── */
+  .requests-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .requests-container::-webkit-scrollbar {
+    width: 4px;
+  }
+  .requests-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .requests-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+  }
+
+  .empty-icon {
+    font-size: 40px;
+    opacity: 0.3;
+  }
+
+  .empty-text {
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* ─── リクエストカード ── */
+  .request-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    animation: slideIn 0.2s ease-out;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .request-card:hover {
+    border-color: var(--accent-blue);
+  }
+
+  .request-card.approved {
+    border-color: var(--accent-green);
+    opacity: 0.6;
+  }
+
+  .request-card.rejected {
+    border-color: var(--accent-red);
+    opacity: 0.6;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 6px;
+    gap: 8px;
+  }
+
+  .tool-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+
+  .tool-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+  }
+
+  .tool-bash { background: rgba(255, 107, 53, 0.15); color: var(--accent-orange); }
+  .tool-edit { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+  .tool-read { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+  .tool-web { background: rgba(168, 85, 247, 0.15); color: var(--claude-purple); }
+  .tool-other { background: rgba(139, 148, 158, 0.15); color: var(--text-secondary); }
+
+  .timeout-bar {
+    height: 2px;
+    background: var(--bg-tertiary);
+    border-radius: 1px;
+    overflow: hidden;
+    margin: 0 14px 8px;
+  }
+
+  .timeout-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-orange), var(--accent-red));
+    transition: width 1s linear;
+  }
+
+  .command-block {
+    margin: 0 14px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+
+  .command-block::-webkit-scrollbar {
+    height: 3px;
+    width: 3px;
+  }
+  .command-block::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  /* シンタックスハイライト */
+  .cmd-keyword { color: var(--accent-blue); }
+  .cmd-flag { color: var(--accent-yellow); }
+  .cmd-string { color: var(--accent-green); }
+  .cmd-path { color: var(--claude-purple); }
+  .cmd-pipe { color: var(--accent-orange); }
+
+  .ai-summary {
+    margin: 0 14px 10px;
+    padding: 8px 12px;
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 2px solid var(--accent-blue);
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .ai-summary-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .risk-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 14px 10px;
+    font-size: 11px;
+  }
+
+  .risk-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .risk-low { color: var(--accent-green); }
+  .risk-low .risk-dot { background: var(--accent-green); }
+  .risk-medium { color: var(--accent-yellow); }
+  .risk-medium .risk-dot { background: var(--accent-yellow); }
+  .risk-high { color: var(--accent-orange); }
+  .risk-high .risk-dot { background: var(--accent-orange); }
+  .risk-critical { color: var(--accent-red); }
+  .risk-critical .risk-dot { background: var(--accent-red); }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 14px 12px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Noto Sans JP', sans-serif;
+    letter-spacing: 0.3px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .btn-approve {
+    background: rgba(63, 185, 80, 0.1);
+    border-color: rgba(63, 185, 80, 0.3);
+    color: var(--accent-green);
+  }
+  .btn-approve:hover {
+    background: rgba(63, 185, 80, 0.2);
+    border-color: var(--accent-green);
+    box-shadow: 0 0 12px rgba(63, 185, 80, 0.2);
+  }
+
+  .btn-reject {
+    background: rgba(248, 81, 73, 0.1);
+    border-color: rgba(248, 81, 73, 0.3);
+    color: var(--accent-red);
+  }
+  .btn-reject:hover {
+    background: rgba(248, 81, 73, 0.2);
+    border-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 81, 73, 0.2);
+  }
+
+  /* ─── フッター ── */
+  .footer {
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .footer-info {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .footer-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tab-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .tab-btn:hover:not(.active) {
+    color: var(--text-secondary);
+  }
+
+  /* ─── 設定パネル ── */
+  .settings-panel {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    gap: 16px;
+    flex-direction: column;
+  }
+
+  .settings-panel.active { display: flex; }
+
+  .setting-group {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .setting-group-title {
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 12px;
+  }
+
+  .setting-item:last-child { border-bottom: none; }
+
+  .setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .setting-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* トグルスイッチ */
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+  }
+
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: all 0.2s;
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+
+  .toggle input:checked ~ .toggle-track {
+    background: rgba(63, 185, 80, 0.2);
+    border-color: var(--accent-green);
+  }
+
+  .toggle input:checked ~ .toggle-thumb {
+    transform: translateX(16px);
+    background: var(--accent-green);
+  }
+
+  /* コードセットアップ */
+  .setup-block {
+    margin: 0 14px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<!-- タイトルバー -->
+<div class="titlebar">
+  <div class="titlebar-left">
+    <div class="app-icon">🛡</div>
+    <span class="app-title">Claude Guard</span>
+  </div>
+  <div class="titlebar-actions">
+    <button class="close-btn" onclick="closeWindow()"></button>
+  </div>
+</div>
+
+<!-- ステータスバー -->
+<div class="status-bar">
+  <div class="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText" style="font-size:12px; color: var(--text-secondary)">待機中</span>
+    <span class="pending-badge" id="pendingBadge" style="display:none">0</span>
+  </div>
+  <div class="quick-actions">
+    <button class="quick-btn approve-all" onclick="approveAll()">✓ 全承認</button>
+    <button class="quick-btn reject-all" onclick="rejectAll()">✕ 全拒否</button>
+  </div>
+</div>
+
+<!-- メインコンテンツ (タブ切替) -->
+<div id="requestsView" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+  <div class="requests-container" id="requestsContainer">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🛡️</div>
+      <div class="empty-text">
+        Claude Codeのコマンドを監視中<br>
+        <span style="font-size:11px; color: var(--text-muted)">実行リクエストが届くとここに表示されます</span>
+      </div>
+      <div class="setup-block" style="margin:0; font-size:10px; max-width:360px;">
+        <span style="color:var(--accent-yellow)"># ~/.claude/settings.json に追加:</span><br>
+        <span style="color:var(--text-muted)">"hooks": {</span><br>
+        &nbsp;&nbsp;<span style="color:var(--text-muted)">"PreToolUse": [{</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--accent-green)">"matcher": "*"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--accent-blue)">"hooks": [{"type":"command","command":"node ~/.claude-guard/hook.js"}]</span><br>
+        &nbsp;&nbsp;}]<br>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定ビュー -->
+<div id="settingsView" class="settings-panel">
+  <div class="setting-group">
+    <div class="setting-group-title">⚡ 自動化</div>
+    <div class="setting-item">
+      <div class="setting-label">
+        <span>自動承認モード</span>
+        <span class="setting-desc">全コマンドを自動的に承認する</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="autoApprove" onchange="updateSetting('autoApprove', this.checked)">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="setting-item">
+      <div class="setting-label">
+        <span>常に前面表示</span>
+        <span class="setting-desc">他のウィンドウより前に表示</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="alwaysOnTop" onchange="updateSetting('alwaysOnTop', this.checked)">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-group-title">✅ 信頼済みコマンド</div>
+    <div class="setting-item" style="flex-direction:column; align-items:flex-start; gap:8px;">
+      <span class="setting-desc">自動承認されるコマンドプレフィックス（1行1コマンド）</span>
+      <textarea id="trustedCommands"
+        style="width:100%; height:80px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-family:JetBrains Mono,monospace; font-size:11px; padding:8px; resize:none; line-height:1.6;"
+        onchange="updateListSetting('trustedCommands', this.value)"></textarea>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-group-title">🚫 ブロックパターン</div>
+    <div class="setting-item" style="flex-direction:column; align-items:flex-start; gap:8px;">
+      <span class="setting-desc">自動拒否されるコマンドパターン（1行1パターン）</span>
+      <textarea id="blockedPatterns"
+        style="width:100%; height:80px; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-family:JetBrains Mono,monospace; font-size:11px; padding:8px; resize:none; line-height:1.6;"
+        onchange="updateListSetting('blockedPatterns', this.value)"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- フッター -->
+<div class="footer">
+  <span class="footer-info" id="serverInfo">port: 3759 ●</span>
+  <div class="footer-tabs">
+    <button class="tab-btn active" id="tabRequests" onclick="switchTab('requests')">リクエスト</button>
+    <button class="tab-btn" id="tabSettings" onclick="switchTab('settings')">設定</button>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+let currentTab = 'requests';
+let currentRequests = [];
+let timers = {};
+
+// ─── IPC ────────────────────────────────────────────────
+ipcRenderer.on('update-requests', (event, requests) => {
+  currentRequests = requests;
+  renderRequests();
+  updateStatus();
+});
+
+ipcRenderer.on('settings', (event, settings) => {
+  applySettings(settings);
+});
+
+ipcRenderer.send('get-settings');
+
+// ─── レンダリング ─────────────────────────────────────
+function renderRequests() {
+  const container = document.getElementById('requestsContainer');
+  const empty = document.getElementById('emptyState');
+
+  if (currentRequests.length === 0) {
+    empty.style.display = 'flex';
+    // 既存カードを削除
+    container.querySelectorAll('.request-card').forEach(el => el.remove());
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  // 既存のカードをチェック
+  const existingIds = new Set(
+    [...container.querySelectorAll('.request-card')].map(el => el.dataset.id)
+  );
+  const newIds = new Set(currentRequests.map(r => r.id));
+
+  // 削除されたカードを消す
+  container.querySelectorAll('.request-card').forEach(el => {
+    if (!newIds.has(el.dataset.id)) el.remove();
+  });
+
+  // 新規カードを追加
+  currentRequests.forEach(req => {
+    if (!existingIds.has(req.id)) {
+      const card = createRequestCard(req);
+      container.prepend(card);
+      startTimeoutAnimation(req.id, req.timeoutIn);
+    }
+  });
+}
+
+function createRequestCard(req) {
+  const card = document.createElement('div');
+  card.className = 'request-card';
+  card.dataset.id = req.id;
+
+  const tool = detectTool(req);
+  const risk = assessRisk(req);
+  const summary = generateSummary(req);
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="tool-badge">
+        <div class="tool-icon tool-${tool.type}">${tool.icon}</div>
+        <span style="color:var(--text-secondary)">${tool.label}</span>
+      </div>
+      <span style="font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">
+        ${new Date(req.timestamp).toLocaleTimeString('ja-JP')}
+      </span>
+    </div>
+    <div class="timeout-bar">
+      <div class="timeout-fill" id="timeout-${req.id}" style="width:100%"></div>
+    </div>
+    <div class="command-block">${highlightCommand(req.command || req.tool_input?.command || JSON.stringify(req.tool_input || {}, null, 2))}</div>
+    ${summary ? `
+    <div class="ai-summary">
+      <div class="ai-summary-label">🤖 AI解説</div>
+      ${summary}
+    </div>
+    ` : ''}
+    <div class="risk-indicator risk-${risk.level}">
+      <div class="risk-dot"></div>
+      <span>リスク: ${risk.label}</span>
+      ${risk.reason ? `<span style="color:var(--text-muted)"> — ${risk.reason}</span>` : ''}
+    </div>
+    <div class="card-actions">
+      <button class="action-btn btn-approve" onclick="approve('${req.id}')">
+        ✓ 許可
+      </button>
+      <button class="action-btn btn-reject" onclick="reject('${req.id}')">
+        ✕ 拒否
+      </button>
+    </div>
+  `;
+
+  return card;
+}
+
+function startTimeoutAnimation(id, timeoutIn) {
+  const fill = document.getElementById(`timeout-${id}`);
+  if (!fill) return;
+
+  const total = 30000;
+  const elapsed = total - timeoutIn;
+  const startPct = ((total - elapsed) / total) * 100;
+  fill.style.width = startPct + '%';
+
+  const interval = setInterval(() => {
+    const req = currentRequests.find(r => r.id === id);
+    if (!req) { clearInterval(interval); return; }
+    const pct = Math.max(0, (req.timeoutIn / total) * 100);
+    if (fill.parentElement) fill.style.width = pct + '%';
+    if (pct <= 0) clearInterval(interval);
+  }, 500);
+
+  timers[id] = interval;
+}
+
+// ─── ツール検出 ─────────────────────────────────────────
+function detectTool(req) {
+  const tool = (req.tool_name || req.tool || '').toLowerCase();
+  const cmd = (req.command || req.tool_input?.command || '').toLowerCase();
+
+  if (tool.includes('bash') || tool.includes('execute') || cmd) {
+    return { type: 'bash', icon: '⚡', label: 'Bash実行' };
+  }
+  if (tool.includes('edit') || tool.includes('write') || tool.includes('create')) {
+    return { type: 'edit', icon: '✏', label: 'ファイル編集' };
+  }
+  if (tool.includes('read') || tool.includes('view')) {
+    return { type: 'read', icon: '👁', label: 'ファイル読取' };
+  }
+  if (tool.includes('web') || tool.includes('search') || tool.includes('fetch')) {
+    return { type: 'web', icon: '🌐', label: 'Web操作' };
+  }
+  return { type: 'other', icon: '⚙', label: tool || 'ツール' };
+}
+
+// ─── リスク評価 ─────────────────────────────────────────
+function assessRisk(req) {
+  const cmd = (req.command || req.tool_input?.command || '').toLowerCase();
+
+  const criticalPatterns = ['rm -rf /', 'sudo rm -rf', '> /dev/sda', 'mkfs', 'dd if=/dev/zero'];
+  const highPatterns = ['sudo ', 'rm -rf', 'chmod -R 777', 'curl.*sh', 'wget.*sh'];
+  const mediumPatterns = ['npm install', 'pip install', 'rm ', 'mv ', 'cp ', 'git push', 'git reset'];
+  const lowPatterns = ['ls', 'cat', 'echo', 'pwd', 'git status', 'git log', 'grep', 'find'];
+
+  for (const p of criticalPatterns) {
+    if (cmd.includes(p)) return { level: 'critical', label: '危険', reason: '破壊的操作の可能性' };
+  }
+  for (const p of highPatterns) {
+    if (cmd.includes(p)) return { level: 'high', label: '高', reason: '権限昇格または破壊操作' };
+  }
+  for (const p of mediumPatterns) {
+    if (cmd.includes(p)) return { level: 'medium', label: '中', reason: 'システム変更操作' };
+  }
+  for (const p of lowPatterns) {
+    if (cmd.includes(p)) return { level: 'low', label: '低', reason: '読み取り専用操作' };
+  }
+
+  return { level: 'medium', label: '中', reason: '不明なコマンド' };
+}
+
+// ─── コマンドサマリー ─────────────────────────────────────
+function generateSummary(req) {
+  const cmd = req.command || req.tool_input?.command || '';
+  if (!cmd) return null;
+
+  const summaries = {
+    'npm install': 'npm パッケージをインストールします',
+    'npm run': 'npm スクリプトを実行します',
+    'git clone': 'Gitリポジトリをクローンします',
+    'git push': '変更をリモートにプッシュします',
+    'git commit': '変更をコミットします',
+    'git pull': '最新の変更を取得します',
+    'git add': 'ファイルをステージングします',
+    'rm -rf': '指定したディレクトリを再帰的に削除します ⚠️',
+    'rm ': 'ファイルを削除します',
+    'mv ': 'ファイルを移動/リネームします',
+    'cp ': 'ファイルをコピーします',
+    'mkdir': 'ディレクトリを作成します',
+    'curl': '外部URLからデータを取得します',
+    'wget': '外部URLからファイルをダウンロードします',
+    'sudo': '管理者権限でコマンドを実行します ⚠️',
+    'python': 'Pythonスクリプトを実行します',
+    'node': 'Node.jsスクリプトを実行します',
+    'ls': 'ディレクトリの内容を一覧表示します',
+    'cat': 'ファイルの内容を表示します',
+    'grep': 'テキストパターンを検索します',
+  };
+
+  const cmdLower = cmd.toLowerCase().trim();
+  for (const [key, desc] of Object.entries(summaries)) {
+    if (cmdLower.startsWith(key)) return desc;
+  }
+
+  return null;
+}
+
+// ─── シンタックスハイライト ───────────────────────────────
+function highlightCommand(cmd) {
+  if (!cmd || typeof cmd !== 'string') return String(cmd);
+
+  return cmd
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^(\w+)/m, '<span class="cmd-keyword">$1</span>')
+    .replace(/\s(--?\w[\w-]*)/g, ' <span class="cmd-flag">$1</span>')
+    .replace(/'([^']*)'/g, '<span class="cmd-string">\'$1\'</span>')
+    .replace(/"([^"]*)"/g, '<span class="cmd-string">"$1"</span>')
+    .replace(/(\/[\w./~-]+)/g, '<span class="cmd-path">$1</span>')
+    .replace(/([|&;]+)/g, '<span class="cmd-pipe">$1</span>');
+}
+
+// ─── アクション ──────────────────────────────────────────
+function approve(id) {
+  ipcRenderer.send('approve', id);
+  flashCard(id, 'approved');
+}
+
+function reject(id) {
+  ipcRenderer.send('reject', id);
+  flashCard(id, 'rejected');
+}
+
+function approveAll() {
+  ipcRenderer.send('approve-all');
+}
+
+function rejectAll() {
+  ipcRenderer.send('reject-all');
+}
+
+function closeWindow() {
+  ipcRenderer.send('close-window');
+}
+
+function flashCard(id, cls) {
+  const card = document.querySelector(`.request-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add(cls);
+    setTimeout(() => card.remove(), 600);
+  }
+}
+
+// ─── ステータス更新 ──────────────────────────────────────
+function updateStatus() {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const badge = document.getElementById('pendingBadge');
+  const count = currentRequests.length;
+
+  if (count > 0) {
+    dot.classList.add('has-pending');
+    text.textContent = `${count}件の承認待ち`;
+    badge.textContent = count;
+    badge.style.display = 'inline';
+  } else {
+    dot.classList.remove('has-pending');
+    text.textContent = '待機中';
+    badge.style.display = 'none';
+  }
+}
+
+// ─── タブ切替 ────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('requestsView').style.display = tab === 'requests' ? 'flex' : 'none';
+  document.getElementById('settingsView').classList.toggle('active', tab === 'settings');
+  document.getElementById('tabRequests').classList.toggle('active', tab === 'requests');
+  document.getElementById('tabSettings').classList.toggle('active', tab === 'settings');
+}
+
+// ─── 設定 ───────────────────────────────────────────────
+function applySettings(settings) {
+  document.getElementById('autoApprove').checked = settings.autoApprove;
+  document.getElementById('alwaysOnTop').checked = settings.alwaysOnTop;
+  document.getElementById('trustedCommands').value = (settings.trustedCommands || []).join('\n');
+  document.getElementById('blockedPatterns').value = (settings.blockedPatterns || []).join('\n');
+}
+
+function updateSetting(key, value) {
+  ipcRenderer.send('update-settings', { [key]: value });
+}
+
+function updateListSetting(key, value) {
+  const list = value.split('\n').map(s => s.trim()).filter(Boolean);
+  ipcRenderer.send('update-settings', { [key]: list });
+}
+
+// 初期化
+setInterval(() => {
+  // タイムアウトバーの更新
+  currentRequests.forEach(req => {
+    const fill = document.getElementById(`timeout-${req.id}`);
+    if (fill) {
+      const pct = Math.max(0, (req.timeoutIn / 30000) * 100);
+      fill.style.width = pct + '%';
+    }
+  });
+}, 500);
+</script>
+</body>
+</html>
