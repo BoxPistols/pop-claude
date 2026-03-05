@@ -1,5 +1,5 @@
 {
-  "name": "claude-guard",
+  "name": "pop-claude",
   "version": "1.0.0",
   "description": "Claude Codeのコマンドをローカルで承認/拒否するmacOSメニューバーアプリ",
   "main": "main.js",
@@ -10,15 +10,15 @@
     "dev": "NODE_ENV=development electron ."
   },
   "build": {
-    "appId": "dev.claudeguard.app",
-    "productName": "Claude Guard",
+    "appId": "dev.popclaude.app",
+    "productName": "pop-claude",
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": ["dmg"],
       "extendInfo": { "LSUIElement": true }
     },
     "directories": { "output": "dist" },
-    "files": ["src/**/*", "hook.js", "setup.js"]
+    "files": ["main.js", "popup.html", "history.html", "hook.js", "setup.js", "tray-iconTemplate*.png"]
   },
   "devDependencies": {
     "electron": "^33.0.0",

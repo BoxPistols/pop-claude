@@ -1,5 +1,5 @@
 /**
- * Claude Guard - メインプロセス
+ * pop-claude - メインプロセス
  * Claude Codeのコマンドをインターセプトして許可/拒否するmacOSメニューバーアプリ
  */
 
@@ -10,7 +10,7 @@ const fs = require('fs');
 const os = require('os');
 
 // ─── 設定 ────────────────────────────────────────────────
-const PORT = 3759; // Claude Guard専用ポート
+const PORT = 3759; // pop-claude専用ポート
 const MAX_QUEUE = 50;
 const AUTO_APPROVE_TIMEOUT_MS = 30_000; // 30秒でタイムアウト → デフォルト拒否
 
@@ -22,7 +22,7 @@ let requestHistory = [];
 let settings = loadSettings();
 
 function loadSettings() {
-  const settingsPath = path.join(os.homedir(), '.claude-guard', 'settings.json');
+  const settingsPath = path.join(os.homedir(), '.pop-claude', 'settings.json');
   const defaults = {
     autoApprove: false,
     alwaysOnTop: true,
@@ -40,7 +40,7 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  const dir = path.join(os.homedir(), '.claude-guard');
+  const dir = path.join(os.homedir(), '.pop-claude');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'settings.json'),
@@ -127,7 +127,7 @@ function startHookServer() {
   });
 
   server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Claude Guard hook server running on port ${PORT}`);
+    console.log(`pop-claude hook server running on port ${PORT}`);
     updateTrayMenu();
   });
 
@@ -200,7 +200,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
   icon.setTemplateImage(false);
   tray = new Tray(icon);
-  tray.setToolTip('Claude Guard');
+  tray.setToolTip('pop-claude');
   tray.on('click', () => showPopupWindow());
   updateTrayMenu();
 }
@@ -222,7 +222,7 @@ function updateTrayMenu() {
 
   const menuItems = [
     {
-      label: `Claude Guard`,
+      label: `pop-claude`,
       enabled: false,
     },
     { type: 'separator' },
@@ -262,7 +262,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Claude Guard を終了',
+      label: 'pop-claude を終了',
       click: () => app.quit(),
     },
   ];
@@ -368,7 +368,7 @@ app.whenReady().then(() => {
   createTray();
 
   // 初回起動時にセットアップガイドを表示
-  const firstRunFlag = path.join(os.homedir(), '.claude-guard', '.initialized');
+  const firstRunFlag = path.join(os.homedir(), '.pop-claude', '.initialized');
   if (!fs.existsSync(firstRunFlag)) {
     showPopupWindow();
     fs.mkdirSync(path.dirname(firstRunFlag), { recursive: true });

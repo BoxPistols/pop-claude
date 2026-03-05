@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Claude Guard Hook Script
- * ~/.claude-guard/hook.js
+ * pop-claude Hook Script
+ * ~/.pop-claude/hook.js
  *
  * Claude Code の PreToolUse フックから呼ばれるスクリプト。
- * コマンドを Claude Guard アプリに送信して承認/拒否を待ちます。
+ * コマンドを pop-claude アプリに送信して承認/拒否を待ちます。
  *
  * Claude Code hooks の仕様:
  *   - stdin から JSON を受け取る
@@ -34,25 +34,34 @@ process.stdin.on('end', async () => {
   try {
     const result = await checkWithGuard(hookData);
     if (result.approved) {
-      // 許可
-      process.stdout.write(JSON.stringify({ continue: true }));
+      // 許可 → permissionDecision: "allow" で「Do you want to proceed?」をスキップ
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+          permissionDecisionReason: result.reason || 'pop-claude で承認済み',
+        }
+      }));
       process.exit(0);
     } else {
-      // 拒否
+      // 拒否 → permissionDecision: "deny" でブロック
       process.stdout.write(JSON.stringify({
-        continue: false,
-        reason: 'Claude Guard によって拒否されました',
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: result.reason || 'pop-claude で拒否されました',
+        }
       }));
-      process.exit(2);
-    }
-  } catch (err) {
-    // ガードが起動していない場合 → 許可してフォールスルー
-    if (err.code === 'ECONNREFUSED') {
-      console.error('[Claude Guard] ガードが起動していません。コマンドを許可します。');
       process.exit(0);
     }
-    console.error('[Claude Guard] エラー:', err.message);
-    process.exit(0); // エラー時は許可
+  } catch (err) {
+    // ガードが起動していない場合 → 許可してフォールスルー（プロンプトは通常表示）
+    if (err.code === 'ECONNREFUSED') {
+      console.error('[pop-claude] ガードが起動していません。通常のプロンプトに委譲します。');
+      process.exit(0);
+    }
+    console.error('[pop-claude] エラー:', err.message);
+    process.exit(0); // エラー時はデフォルト動作（プロンプト表示）
   }
 });
 

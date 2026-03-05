@@ -1,6 +1,8 @@
-# 🛡 Claude Guard
+# 🛡 pop-claude
 
 Claude Codeが実行しようとするコマンドをローカルで要約・解説し、メニューバーから**許可/拒否**できるmacOSアプリ。
+
+pop-claude が承認したコマンドは Claude Code の「Do you want to proceed?」プロンプトを**自動スキップ**します。GUI で一度承認すれば、CLI 側で再確認は不要です。
 
 ## アーキテクチャ
 
@@ -10,17 +12,27 @@ Claude Code
     ├── PreToolUse hook (毎コマンド実行前)
     │         │
     │         ▼
-    │   ~/.claude-guard/hook.js
+    │   ~/.pop-claude/hook.js
     │         │ HTTP POST /check
     │         ▼
-    │   Claude Guard App (port 3759)
+    │   pop-claude App (port 3759)
     │         │ 承認待ち...
     │         ▼ ← ユーザーがメニューバーで許可/拒否
-    │   { approved: true/false }
+    │   permissionDecision: "allow" / "deny"
     │         │
-    ▼   exit 0 (許可) / exit 2 (拒否)
-  実行 or スキップ
+    ▼   exit 0 → Claude Code が判定を受理
+  実行 or スキップ（CLI プロンプトなし）
 ```
+
+### hooks 連携の仕組み
+
+フックは Claude Code の `permissionDecision` API に準拠しています。
+
+| pop-claude の判定 | stdout JSON | Claude Code の動作 |
+|---|---|---|
+| 承認 | `permissionDecision: "allow"` | **即実行**（プロンプトなし） |
+| 拒否 | `permissionDecision: "deny"` | **ブロック**（プロンプトなし） |
+| アプリ未起動 | なし（exit 0 のみ） | 通常の「Do you want to proceed?」表示 |
 
 ## インストール
 
@@ -79,7 +91,7 @@ npm start
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude-guard/hook.js"
+            "command": "node ~/.pop-claude/hook.js"
           }
         ]
       }
@@ -96,27 +108,31 @@ npm start
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "node ~/.claude-guard/hook.js" }]
+        "hooks": [{ "type": "command", "command": "node ~/.pop-claude/hook.js" }]
       },
       {
         "matcher": "Write",
-        "hooks": [{ "type": "command", "command": "node ~/.claude-guard/hook.js" }]
+        "hooks": [{ "type": "command", "command": "node ~/.pop-claude/hook.js" }]
       }
     ]
   }
 }
 ```
 
-## ビルド (配布用 .app / .dmg)
+## ビルド (ネイティブアプリ化)
+
+Electron 製なので、単体で動作する macOS ネイティブアプリ（`.app`）にパッケージングできます。
 
 ```bash
 npm run build
-# dist/ に .dmg が生成される
+# dist/ に .app と .dmg が生成される
 ```
+
+生成された `.app` は Node.js 不要で起動でき、他の Mac にもそのまま配布可能です。
 
 ## 設定ファイル
 
-`~/.claude-guard/settings.json`:
+`~/.pop-claude/settings.json`:
 
 ```json
 {
@@ -131,8 +147,8 @@ npm run build
 
 ## トラブルシューティング
 
-**ガードが起動していない場合**: フックはタイムアウトせずに `exit 0` で許可します。
+**アプリ未起動でも安全**: フックは接続失敗時に JSON なしの `exit 0` を返すため、通常の「Do you want to proceed?」に戻ります。コマンドが勝手に実行されることはありません。
 
-**ポート競合**: デフォルトは `3759`。`src/main.js` の `PORT` を変更してください。
+**ポート競合**: デフォルトは `3759`。`main.js` の `PORT` を変更してください。
 
 **フックが呼ばれない**: `claude --version` で v1.5+ 以上を確認してください。
