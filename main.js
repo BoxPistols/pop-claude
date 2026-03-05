@@ -195,62 +195,13 @@ function recordHistory(meta, approved, method) {
 }
 
 // ─── Tray (メニューバー) ──────────────────────────────────
-function generateTrayIconFile() {
-  const zlib = require('zlib');
-  const size = 32;
-  const pixels = Buffer.alloc(size * size * 4, 0);
-  function setPixel(x, y, a) {
-    if (x < 0 || x >= size || y < 0 || y >= size) return;
-    const i = (y * size + x) * 4;
-    pixels[i] = 0; pixels[i+1] = 0; pixels[i+2] = 0; pixels[i+3] = a;
-  }
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const cx = 15.5, topY = 4;
-      const nx = (x - cx) / 12;
-      const ny = (y - topY) / 24;
-      const inOuter = Math.abs(nx) <= 1 - ny * ny * 0.3 && ny >= 0 && ny <= 1;
-      const nx2 = (x - cx) / 10.5;
-      const ny2 = (y - topY - 1.5) / 21;
-      const inInner = Math.abs(nx2) <= 1 - ny2 * ny2 * 0.3 && ny2 >= 0 && ny2 <= 1;
-      if (inOuter && !inInner) setPixel(x, y, 200);
-    }
-  }
-  function crc32(buf) {
-    let c = 0xFFFFFFFF;
-    for (let i = 0; i < buf.length; i++) { c ^= buf[i]; for (let j = 0; j < 8; j++) c = (c >>> 1) ^ (c & 1 ? 0xEDB88320 : 0); }
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-  function chunk(type, data) {
-    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-    const t = Buffer.from(type);
-    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data])));
-    return Buffer.concat([len, t, data, crc]);
-  }
-  const sig = Buffer.from([137,80,78,71,13,10,26,10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; ihdr[9] = 6;
-  const raw = Buffer.alloc(size * (1 + size * 4));
-  for (let y = 0; y < size; y++) {
-    raw[y * (1 + size * 4)] = 0;
-    pixels.copy(raw, y * (1 + size * 4) + 1, y * size * 4, (y+1) * size * 4);
-  }
-  const zlib2 = require('zlib');
-  const png = Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', zlib2.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
-  const iconDir = path.join(os.homedir(), '.claude-guard');
-  if (!fs.existsSync(iconDir)) fs.mkdirSync(iconDir, { recursive: true });
-  const iconPath = path.join(iconDir, 'tray-icon.png');
-  fs.writeFileSync(iconPath, png);
-  return iconPath;
-}
-
 function createTray() {
-  const iconPath = generateTrayIconFile();
+  const iconPath = path.join(__dirname, 'tray-iconTemplate.png');
   const icon = nativeImage.createFromPath(iconPath);
   icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip('Claude Guard');
+  tray.on('click', () => showPopupWindow());
   updateTrayMenu();
 }
 
