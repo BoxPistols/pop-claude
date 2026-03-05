@@ -198,7 +198,7 @@ function recordHistory(meta, approved, method) {
 function createTray() {
   const iconPath = path.join(__dirname, 'tray-iconTemplate.png');
   const icon = nativeImage.createFromPath(iconPath);
-  icon.setTemplateImage(true);
+  icon.setTemplateImage(false);
   tray = new Tray(icon);
   tray.setToolTip('Claude Guard');
   tray.on('click', () => showPopupWindow());
