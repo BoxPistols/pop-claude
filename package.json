@@ -13,6 +13,7 @@
     "appId": "dev.popclaude.app",
     "productName": "pop-claude",
     "mac": {
+      "icon": "icon.icns",
       "category": "public.app-category.developer-tools",
       "target": ["dmg"],
       "extendInfo": { "LSUIElement": true }
